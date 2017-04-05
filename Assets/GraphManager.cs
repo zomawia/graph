@@ -9,9 +9,6 @@ public class GraphManager : MonoBehaviour
     private GraphProject.Solver<Transform> solver;
 
     public List<Transform> start, end;
-
-    public Transform pathStart, pathEnd;
-    public List<Transform> path;
     public int gridSize = 4;
     public float gridSpace = 1;
     public bool genGridKeep = false;
@@ -30,14 +27,16 @@ public class GraphManager : MonoBehaviour
     }
 
     //returns true if the edge is valid
-    bool ValidatedEdge(Transform start, Transform end)
-    {
+    bool ValidatedEdge(Transform start, Transform end, bool useObstruction = true)
+    {        
         var diff = end.position - start.position;
         RaycastHit info;
         bool result = Physics.SphereCast(start.position, 0.1f, 
             diff.normalized, out info, Vector3.Magnitude(diff));
 
-        return !(result || IsObstructed(start) || IsObstructed(end));
+        
+        return !(result || useObstruction && IsObstructed(start)
+                        || useObstruction && IsObstructed(end) );
     }
 
     void InitializeGraph()
@@ -72,7 +71,7 @@ public class GraphManager : MonoBehaviour
     }
 
     // Use this for initialization
-    void Start()
+    void Awake()
     {
         InitializeGraph();
     }
@@ -105,26 +104,28 @@ public class GraphManager : MonoBehaviour
 
     public List<Vector3> FindPathBetween(Transform start, Transform end)
     {
-        solver.init(pathStart, pathEnd, diff, 100.0f);
+        if (graph == null || solver == null)
+            InitializeGraph();
+        solver.init(start, end, diff, 100.0f);
         while (solver.step()) ;
-        path = solver.solution;
+        var path = solver.solution;
 
         List<Vector3> retval = new List<Vector3>();
         Transform source = path[0];
         retval.Add(source.position);
 
         for (int i = 1; i < path.Count; ++i)        
-            if(!ValidatedEdge(source, path[i]) && path[i] != end &&
-                path[0] != source)
+            if(!ValidatedEdge(source, path[i], source != path[0]) 
+                && path[i] != end)
             {                
                 source = path[i - 1];
                 retval.Add(source.position);
             }
-        retval.Add(path[path.Count-1].position);
+        retval.Add(path[path.Count - 1].position);
 
         return retval;
     }
-    // Called by the editor when a serialized field is modified
+
     private void OnValidate()
     {
         // check gate
